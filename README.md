@@ -18,7 +18,7 @@ Annotations in the .R script describe input files, although all analyses can be 
 - Input file: seqtab_anemone.rds sequence table 
 - Input file: taxa_anemone.rds taxonomy table
 
-- * for input sequences: Please see demultiplexed sequences, available at the National Center for Biotechnology Information (NCBI) Sequence Read Archives (SRA) under accession code: ________________
+- Sequences: Please see demultiplexed sequences, available at the National Center for Biotechnology Information (NCBI) Sequence Read Archives (SRA) under accession code: ________________
 
 
 # Scripts 
