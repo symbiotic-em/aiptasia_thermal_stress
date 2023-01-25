@@ -6,7 +6,7 @@ Anemones were subjected to thermal stress and symbiont expulsion (mild bleaching
 
 Annotations in the .R script describe input files, although all analyses can be re-created by starting with the raw .fastq files available for download at NCBI SRA under accession code: ____________.
 
-#Files in this repository
+# Files in this repository
 
 Input file: alpha_diversity_sym1.csv alpha diversity, sym_host_ratios and select taxa abundance counts for symbiotic anemones only
 Input file: all_oligos.txt text file containing all sequences used for the phylogenetic analyses. Should be connverted to .fa before analysis
@@ -19,7 +19,7 @@ Input file: seqtab_anemone.rds sequence table
 Input file: taxa_anemone.rds taxonomy table 
 
 
-#Scripts 
+# Scripts 
 dada2_anemone_16S: Annotated R script (based on DADA2 pipeline tutorial) for making amplicon sequencing variants from fastqc files.
 general_microbiome_analysis: Annotated R script (based on Phyloseq and other statistical software in R) for general analysis and visualization of metabarcoded data
 sym_host_ratio: Annotated R script containing info on how to conduct stats, correlation plots, and visualizations of samples assesed for sym host ratios   
