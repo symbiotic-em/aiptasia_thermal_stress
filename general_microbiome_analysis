@@ -1,0 +1,738 @@
+########### Set Phylosq ######################
+library(ape)
+library(phyloseq)
+library(ggplot2)
+library(ShortRead)
+library(data.table)
+library(plyr)
+library(vegan)
+library(grid)
+library(DESeq2)
+#library(DESeq)
+library(outliers)
+library(gridExtra)#for grid.arrange
+library("nlme")
+library("reshape2")
+library("dplyr")
+library("edgeR"); packageVersion("edgeR")
+library(arrayQualityMetrics)
+library(microbiome) 
+library(eulerr)
+library(dunn.test)
+library(ggpubr)
+library(RColorBrewer)
+library(paletteer)
+setwd("/Users/emily/Documents/Anemone_TS")
+
+seqtab=readRDS("seqtab_anemone.rds")
+taxa=readRDS("taxa_anemone.rds")
+#taxa=replace(taxa, taxa == " ", NA) 
+#samdata=read.csv("samdata.csv")
+samdata=read.csv("samdata_anemone.csv")
+head(samdata)
+rownames(samdata)=samdata$sample_ID
+
+#create phyloseq object
+
+ps=phyloseq(otu_table(seqtab, taxa_are_rows=FALSE), sample_data(samdata), tax_table(taxa))#4577 taxa, 52 samples
+
+######################### Remove chloroplasts and mitochondria #######################################
+
+#4577 taxa but what happens when
+#filter out chloroplasts, mitochondria, protists and taxa counts 0 and under?
+
+ps1=subset_taxa(ps, (Class!="Chloroplast"))
+
+ps1 #still 4498 ASVs
+ps1=subset_taxa(ps1, Family !="Mitochondria" | is.na(Family)) #4471 ASVs taxa left, make sure to indicate not to remove NA values 
+#because this is how we missed the oligoflexales differences between symbiotic and non symbiotic anemones the first time analyzing this 
+ps1
+ps1=prune_taxa(taxa_sums(ps1) > 0, ps1)
+ps1 #now we have 4471 ASVs and 52 samples
+
+#no more filtering needed (no protists in the taxonomy table) 
+
+
+##########################   Rarefy and add tree   ###########################################
+ 
+#find out how many reads in each sample before rarefying
+
+plot(sort(sample_sums(ps),TRUE),type="h", ylab="reads")#ok 
+
+ps_rare <- phyloseq::rarefy_even_depth(ps, rngseed = 123, replace = FALSE)
+ps_rare #4299 taxa, 52 samples 1590 ASVs removed
+
+
+#what was everyone rarefied to?  
+summary(sample_sums(ps_rare)) # all samples rarefied to 26,481 reads! Nice...
+
+############################# rarefaction curves #############################
+
+library(phyloseq.extended)
+# using ps vs ps_rare
+p <- ggrare(ps, step = 1000, se = FALSE)
+
+p <- p + facet_wrap(~grupos)+ theme_bw()
+p
+
+#with the exception of a sample in each group with many reads, most samples have the same rarefaction curve pattern in raw and rarefied data 
+
+length(get_taxa_unique(ps_rare, taxonomic.rank = "Genus"))
+#add a tree
+random_tree=rtree(ntaxa(ps_rare), rooted=TRUE, tip.label=taxa_names(ps_rare))
+#merge the tree
+ps1=merge_phyloseq(ps_rare, random_tree)
+ps1 
+
+
+############### Get abundances and averages/ summarize taxa ########################
+
+#adapted from answers to questions in the Phyloseq forums > https://github.com/joey711/phyloseq/issues
+
+library("data.table")
+
+
+fast_melt = function(physeq){
+  # supports "naked" otu_table as `physeq` input.
+  otutab = as(otu_table(physeq), "matrix")
+  if(!taxa_are_rows(physeq)){otutab <- t(otutab)}
+  otudt = data.table(otutab, keep.rownames = TRUE)
+  setnames(otudt, "rn", "taxaID")
+  # Enforce character taxaID key
+  otudt[, taxaIDchar := as.character(taxaID)]
+  otudt[, taxaID := NULL]
+  setnames(otudt, "taxaIDchar", "taxaID")
+  # Melt count table
+  mdt = melt.data.table(otudt, 
+                        id.vars = "taxaID",
+                        variable.name = "SampleID",
+                        value.name = "count")
+  # Remove zeroes, NAs
+  mdt <- mdt[count > 0][!is.na(count)]
+  # Calculate relative abundance
+  mdt[, RelativeAbundance := count / sum(count), by = SampleID]
+  if(!is.null(tax_table(physeq, errorIfNULL = FALSE))){
+    # If there is a tax_table, join with it. Otherwise, skip this join.
+    taxdt = data.table(as(tax_table(physeq, errorIfNULL = TRUE), "matrix"), keep.rownames = TRUE)
+    setnames(taxdt, "rn", "taxaID")
+    # Enforce character taxaID key
+    taxdt[, taxaIDchar := as.character(taxaID)]
+    taxdt[, taxaID := NULL]
+    setnames(taxdt, "taxaIDchar", "taxaID")
+    # Join with tax table
+    setkey(taxdt, "taxaID")
+    setkey(mdt, "taxaID")
+    mdt <- taxdt[mdt]
+  }
+  return(mdt)
+}
+
+summarize_taxa = function(physeq, Rank, GroupBy = NULL){
+  Rank <- Rank[1]
+  if(!Rank %in% rank_names(physeq)){
+    message("The argument to `Rank` was:\n", Rank,
+            "\nBut it was not found among taxonomic ranks:\n",
+            paste0(rank_names(physeq), collapse = ", "), "\n",
+            "Please check the list shown above and try again.")
+  }
+  if(!is.null(GroupBy)){
+    GroupBy <- GroupBy[1]
+    if(!GroupBy %in% sample_variables(physeq)){
+      message("The argument to `GroupBy` was:\n", GroupBy,
+              "\nBut it was not found among sample variables:\n",
+              paste0(sample_variables(physeq), collapse = ", "), "\n",
+              "Please check the list shown above and try again.")
+    }
+  }
+  # Start with fast melt
+  mdt = fast_melt(physeq)
+  if(!is.null(GroupBy)){
+    # Add the variable indicated in `GroupBy`, if provided.
+    sdt = data.table(SampleID = sample_names(physeq),
+                     var1 = get_variable(physeq, GroupBy))
+    setnames(sdt, "var1", GroupBy)
+    # Join
+    setkey(sdt, SampleID)
+    setkey(mdt, SampleID)
+    mdt <- sdt[mdt]
+  }
+  # Summarize
+  Nsamples = nsamples(physeq)
+  summarydt = mdt[, list(meanRA = mean(RelativeAbundance),
+                         sdRA = sd(RelativeAbundance),
+                         minRA = min(RelativeAbundance),
+                         maxRA = max(RelativeAbundance)),
+                  by = c(Rank, GroupBy)]
+  return(summarydt)
+}
+
+plot_taxa_summary = function(physeq, Rank, GroupBy = NULL){
+  # Get taxa summary table 
+  dt1 = summarize_taxa(physeq, Rank = Rank, GroupBy = GroupBy)
+  # Set factor appropriately for plotting
+  RankCol = which(colnames(dt1) == Rank)
+  setorder(dt1, -meanRA)
+  dt1[, RankFac := factor(dt1[[Rank]], 
+                          levels = rev(dt1[[Rank]]))]
+  dt1[, ebarMax := max(c(0, min(meanRA + sdRA))), by = eval(Rank)]
+  dt1[, ebarMin := max(c(0, min(meanRA - sdRA))), by = eval(Rank)]
+  # Set zeroes to one-tenth the smallest value
+  ebarMinFloor = dt1[(ebarMin > 0), min(ebarMin)]
+  ebarMinFloor <- ebarMinFloor / 10
+  dt1[(ebarMin == 0), ebarMin := ebarMinFloor]
+
+  pRank = ggplot(dt1, aes(x = meanRA, y = RankFac)) +
+    scale_x_log10() +
+    xlab("Mean Relative Abundance") +
+    ylab(Rank) +
+    theme_bw()
+  if(!is.null(GroupBy)){
+    # pRank <- pRank + facet_wrap(facets = as.formula(paste("~", GroupBy)))
+    pRank <- pRank + geom_point(mapping = aes_string(colour = GroupBy),
+                                size = 5)
+  } else {
+    # Don't include error bars for faceted version
+    pRank <- pRank + geom_errorbarh(aes(xmax = ebarMax,
+                                        xmin = ebarMin))
+  }
+  return(pRank)
+}
+
+
+# Test it out and it works!
+
+a= plot_taxa_summary(ps_rare, "Phylum")
+a=summarize_taxa(ps_rare, "Phylum")
+write.csv(a, "ps_rare_phylum_01032023_ra_stats.csv")
+
+b= plot_taxa_summary(ps_rare, "Order")
+b=summarize_taxa(ps_rare, "Order")
+write.csv(b, "ps_rare_order_01032023_stats.csv")
+
+
+################### subset to the 4 groups of interest ##########################
+#to plot relative abundance or counts, phylum. Adjust to relative abundance or counts
+
+#filter out taxa that doesn't appear more than 3x in more than 4 samples (the minimum for the tank replicates)so 4/52= 0.07692. 
+ps2_rare=filter_taxa(ps_rare, function(x) sum(x > 3) > (0.0769 *length(x)), TRUE)
+ps2_rare
+
+length(get_taxa_unique(ps2_rare, taxonomic.rank = "Genus"))
+[570]
+#add a tree
+random_tree=rtree(ntaxa(ps2_rare), rooted=TRUE, tip.label=taxa_names(ps2_rare))
+#merge the tree
+ps2_rare=merge_phyloseq(ps2_rare, random_tree)
+ps2_rare
+
+ps2_rare=prune_taxa(taxa_sums(ps2_rare) > 0, ps2_rare)
+
+************************************************************
+
+#first subset syms ctrl and syms heat with non-filtered reads 
+sym_1=subset_samples(ps_rare, status=="symbiotic")
+sym_1 #4386 taxa and 31 samples 
+
+#now subset syms ctrl and syms heat with filtered reads and transform to relative abundance 
+sym=subset_samples(ps2_rare, status=="symbiotic")
+sym #774 taxa and 31 samples 
+
+
+*************************************************************
+#first subset apo ctrl and syms heat with non-filtered reads 
+apo_1=subset_samples(ps_rare, status!="symbiotic")
+apo_1 #4386 taxa and 21 samples 
+
+#now subset apo ctrl and syms heat
+apo=subset_samples(ps2_rare, status!="symbiotic") #exclude symbiotic and only apo remains
+apo #774 taxa and 21 samples 
+
+*********************** METACODER ***************************************
+####Differential abundance and taxonomy trees 
+
+library(metacoder) #detach package after done using because it masks functions in other packages 
+
+#parse your ps2_rare phyloseq object to metacoder native data format 
+
+ps2_m=parse_phyloseq(ps2_rare)
+ps2_m
+
+
+## Calculate relative abundance
+ps2_m$data$rel_abd <- calc_obs_props(ps2_m, "otu_table", other_cols = T)
+print(ps2_m)
+
+
+## Calculate per-taxon abundance
+ps2_m$data$tax_rel_abd <- calc_taxon_abund(ps2_m, "rel_abd")
+print(ps2_m)
+
+
+
+############### heat tree #####################
+
+## difference of taxon abundances per group
+# compare relative abundance per group
+ps2_m$data$diff_site <- compare_groups(ps2_m, data = "tax_rel_abd",
+                                     cols = ps2_m$data$sample_data$sample_id,
+                                     groups = ps2_m$data$sample_data$grupos)
+
+
+a=print(ps2_m$data$diff_site)
+write.csv(a, "treatments_metacoder.csv")
+warnings()
+
+#log2ratio explanation from Zachary Foster, Issue 206: "It is the same information as a difference in abundance, but better for plotting. Its a ratio instead of a difference so that differences in taxa with a small proportion of the reads are visible (e.g. two taxa with 1% and 2% of reads is the same ratio as two with 10% and 20%). The ratio is log transformed so that it is centered on 0 and symmetric."
+
+#pairwise, so use this code with separate sym or apo datasets
+
+set.seed(1)
+heat_tree(ps2_m, 
+          node_label = taxon_names,
+          node_size = n_obs,
+          node_color = log2_median_ratio, 
+          node_color_interval = c(-2, 2),
+          node_color_range = c("#009E73", "gray", "#CC79A7"),
+          node_size_axis_label = "ASV count",
+          node_label_max= 75,
+          node_label_size=2,
+          node_color_axis_label = "Log 2 ratio of median proportions")
+
+
+#p.adjust
+ps2_m$data$diff_site$wilcox_p_value <- p.adjust(ps2_m$data$diff_site$wilcox_p_value,
+                                               method = "fdr")
+#check distribution
+range(ps2_m$data$diff_site$wilcox_p_value, finite=TRUE)
+
+#for those differences that were not significant, set to zero and visualize the heat tree again
+
+ps2_m$data$diff_site$log2_median_ratio[ps2_m$data$diff_site$wilcox_p_value > 0.05]<- 0
+
+#repeat heat tree code, any differences?
+#pairwise
+set.seed(1)
+heat_tree(ps2_m, 
+          node_label = taxon_names,
+          node_size = n_obs,
+          node_color = log2_median_ratio, 
+          node_color_interval = c(-2, 2),
+          node_color_range = c("#009E73", "gray", "#CC79A7"),
+          node_size_axis_label = "ASV count",
+          node_label_size=2,
+          node_label_max=75,
+          node_color_axis_label = "Log 2 ratio of median proportions")
+
+#hahahaha, of course, yes!now do with other dataset 
+
+# use this code for multiple comparisons, if you want use the whole dataset
+
+
+set.seed(1)
+heat_tree_matrix(ps2_m,
+data= "diff_site",
+node_label = taxon_names, 
+node_size = n_obs,
+node_color = log2_median_ratio,
+node_color_trans= "linear",
+node_color_range=  c("#009E73", "gray", "#CC79A7"),
+node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+edge_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+node_size_axis_label = "No. of ASV",
+node_label_size= 7,
+node_label_max=90,
+node_color_axis_label = "log2 ratio of median proportions",
+layout = "davidson-harel", # The primary layout algorithm
+initial_layout = "reingold-tilford",
+key_size=0.69)
+
+#okay now fdr adjust and repeat
+#p.adjust
+ps2_m$data$diff_site$wilcox_p_value <- p.adjust(ps2_m$data$diff_site$wilcox_p_value,
+                                               method = "fdr")
+#check distribution
+range(ps2_m$data$diff_site$wilcox_p_value, finite=TRUE)
+
+#for those differences that were not significant, set to zero and repeat the heat tree
+
+ps2_m$data$diff_site$log2_median_ratio[ps2_m$data$diff_site$wilcox_p_value > 0.05]<- 0
+
+#repeat the heat_tree above, anything change?
+
+
+
+############################## Alpha diversity and stats ##################################
+detach(package:phyloseq.extended, unload=TRUE)
+
+#chao1, shannon and richness plots 
+
+alph <- estimate_richness(ps_rare, measures = c("Observed", "Shannon", "Simpson", "Chao1", "Fisher"))
+alph
+write.csv(alph, "alpha_diversity_ps_rare.csv") #for a record or other analysis, like corrplots
+#plot richness by measure
+p1= plot_richness(ps_rare, x="grupos", measures= "Chao1")+  geom_boxplot(fill="gray") + theme(text = element_text(size = 16))+ theme_bw()
+p1w2=p1+ theme(axis.text.x = element_text(face="bold", 
+                           size=12),
+          axis.text.y = element_text(face="bold",  
+                           size=14))+
+           theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))+
+       ylab("Chao1 diversity")+ xlab ("Treatment")
+p1w2
+
+#is the data normal?
+hist(alph$Chao1, main="Chao1 diversity", breaks=10) #mmmm kind of 
+
+#Now we want to know if groups are different 
+
+my_factors = data.frame(sample_data(ps_rare))
+summary(ps_rare)
+set.seed(123)
+aov_alpha_genets=aov(alph$Chao1 ~ my_factors$grupos)
+summary(aov_alpha_genets) 
+#     Df Sum Sq Mean Sq F value  Pr(>F)   
+#my_factors$grupos  3 244265   81422   4.312 0.00901 **
+#Residuals         48 906389   18883                   
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#who is different?
+TukeyHSD(aov_alpha_genets) #ok so group that is sig differently after padj sym heat/apo control and sym heat/sym control
+
+#Tukey multiple comparisons of means
+ #   95% family-wise confidence level
+
+#Fit: aov(formula = alph$Chao1 ~ my_factors$grupos)
+
+#$`my_factors$grupos`
+#                               diff       lwr         upr     p adj
+#apo_heat-apo_control     -16.754810 -178.0198 144.5102193 0.9925194
+#sym_control-apo_control   -5.001352 -157.3825 147.3797773 0.9997576
+#sym_heat-apo_control    -158.371427 -312.5703  -4.1725658 0.0420543
+#sym_control-apo_heat      11.753458 -127.9062 151.4130696 0.9959826
+#sym_heat-apo_heat       -141.616617 -283.2573   0.0240811 0.0500538
+#sym_heat-sym_control    -153.370075 -284.8071 -21.9330695 0.0162628
+
+
+
+############################Beta diversity ########################
+#all of them 
+
+#Ok lets do some PCoA plots and heatmaps of the taxa
+show_col(paletteer::paletteer_d("RColorBrewer::BrBG"))
+#don't like the order of the colors so I'm reversing them
+tank_colors=c("#003C30FF", "#01665EFF", "#35978FFF", "#80CDC1FF", "#C7EAE5FF", "#F5F5F5FF", "#F6E8C3FF", "#DFC27DFF", "#BF812DFF", "#8C510AFF", "#543005FF")
+
+treat_colors=c("#01665EFF", "#80CDC1FF", "#543005FF", "#BF812DFF") 
+
+set.seed(123)
+ordinate<- ordinate(ps2_rare, method = "PCoA", distance ="wunifrac")
+evals <- ordinate$values$Eigenvalues
+p3=plot_ordination(ps2_rare, ordinate, color = "grupos", shape = "status")  + scale_color_manual(values= treat_colors) 
+ coord_fixed(sqrt(evals[2] / evals[1])) +
+  labs(col = "treatment", shape = "status")+ geom_point(size = 2) + theme_bw() + theme(text = element_text(size = 14))+
+  facet_wrap(~grupos, ncol=1)+ theme(axis.text.x = element_text(face="bold", 
+                           size=14),
+          axis.text.y = element_text(face="bold",  
+                           size=14))
+p3
+
+
+#verify with PERMANOVA there's differences 
+# lets look for differences between sym control vs sym heat and apo control vs apo heat 
+
+dfbray=phyloseq::distance(sym, method="bray")
+sampledf=data.frame(sample_data(sym))
+beta=betadisper(dfbray, sampledf$grupos)
+beta
+permutest(beta) #p=0.21, even dispersion
+#Number of permutations: 999
+#Response: Distances
+#          Df    Sum Sq    Mean Sq      F N.Perm Pr(>F)
+#Groups     1 0.0017651 0.00176513 1.8266    999   0.21
+#Residuals 29 0.0280245 0.00096636 
+
+adonis2(formula = dfbray ~ grupos, data = sampledf)#p=0.001, yes sig differences between treatments
+Permutation test for adonis under reduced model
+Terms added sequentially (first to last)
+Permutation: free
+Number of permutations: 999
+
+adonis2(formula = dfbray ~ grupos, data = sampledf)
+#         Df SumOfSqs     R2      F Pr(>F)    
+#grupos    1  0.11285 0.1931 6.9402  0.001 ***
+#Residual 29  0.47154 0.8069                  
+#Total    30  0.58439 1.0000                  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+dfbray=phyloseq::distance(apo, method="bray")
+sampledf=data.frame(sample_data(apo))
+beta=betadisper(dfbray, sampledf$grupos)
+beta
+permutest(beta)#p=0.197, evenly dispersed so adonis
+#Permutation test for homogeneity of multivariate dispersions
+#Permutation: free
+#Number of permutations: 999
+#Response: Distances
+#          Df    Sum Sq    Mean Sq      F N.Perm Pr(>F)
+#Groups     1 0.0017651 0.00176513 1.8266    999  0.197
+#Residuals 29 0.0280245 0.00096636 
+
+adonis2(formula = dfbray ~ grupos, data = sampledf) #p=0.001
+Permutation test for adonis under reduced model
+Terms added sequentially (first to last)
+Permutation: free
+Number of permutations: 999
+
+adonis2(formula = dfbray ~ grupos, data = sampledf)
+#         Df SumOfSqs      R2      F Pr(>F)    
+#grupos    1 0.069137 0.22387 5.4803  0.001 ***
+#Residual 19 0.239697 0.77613                  
+#Total    20 0.308834 1.00000                  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#let's find out which taxa might be driving these differences...
+#first we can do a heatmap just to see where the differences may be 
+tax_glom = tax_glom(ps2_rare, taxrank="Order")
+tax_glom = transform_sample_counts(tax_glom, function(x){x / sum(x)})
+p <- plot_heatmap(tax_glom, "NMDS", "bray", sample.order="status", "grupos", "Order", low="#FFFFCC", high="#000033", na.value="white")
+p
+
+#sym vs apo differences, regardless of treatment based on status only:
+#create dataframe 
+
+dfbray=phyloseq::distance(ps2_rare, method="bray")
+sampledf=data.frame(sample_data(ps2_rare))
+#test for homogeneity of groups dispersions for each group set, if even dispersion= use adonis (PERMANOVA)
+beta=betadisper(dfbray, sampledf$status)
+beta
+permutest(beta) #evenly dispersed
+#Permutation test for homogeneity of multivariate dispersions
+#Permutation: free
+#Number of permutations: 999
+
+#Response: Distances
+#          Df   Sum Sq  Mean Sq      F N.Perm Pr(>F)
+#Groups     1 0.002856 0.002856 2.2383    999   0.14
+#Residuals 50 0.063799 0.001276          
+adonis2(dfbray ~ status, data=sampledf) #p-value is 0.007, so yes there's differences in state
+#Permutation test for adonis under reduced model
+#Terms added sequentially (first to last)
+#Permutation: free
+#Number of permutations: 999
+
+#PERMANOVA
+adonis2(formula = dfbray ~ status, data = sampledf)
+#         Df SumOfSqs      R2      F Pr(>F)   
+#status    1  0.04622 0.04976 2.6182  0.007 **
+#Residual 50  0.88273 0.95024                 
+#Total    51  0.92895 1.00000                 
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#control vs heat differences, regardless of status :
+#create dataframe 
+dfbray=phyloseq::distance(ps2_rare, method="bray")
+sampledf=data.frame(sample_data(ps2_rare))
+#test for homogeneity of groups dispersions for each group set, if even dispersion= use adonis (PERMANOVA)
+beta=betadisper(dfbray, sampledf$treatment)
+beta
+permutest(beta) #yes, evenly dispersed  p=0.143
+#Permutation test for homogeneity of multivariate dispersions
+#Permutation: free
+#Number of permutations: 999
+
+#Response: Distances
+#          Df   Sum Sq   Mean Sq     F N.Perm Pr(>F)
+#Groups     1 0.002748 0.0027481 2.293    999  0.143
+#Residuals 50 0.059923 0.0011985
+
+#PERMANOVA                    
+adonis2(formula = dfbray ~ treatment, data = sampledf) #sure, significantly different too p=0.001
+#Permutation test for adonis under reduced model
+#Terms added sequentially (first to last)
+#Permutation: free
+#Number of permutations: 999
+
+#adonis2(formula = dfbray ~ treatment, data = sampledf)
+          Df SumOfSqs      R2      F Pr(>F)    
+#treatment  1  0.10856 0.11686 6.6163  0.001 ***
+#Residual  50  0.82039 0.88314                  
+#Total     51  0.92895 1.00000                  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#what about sym vs apo in control only?
+
+#create dataframe 
+dfbray=phyloseq::distance(ctrl, method="bray")
+sampledf=data.frame(sample_data(ctrl))
+beta=betadisper(dfbray, sampledf$status)
+beta
+permutest(beta) #p=0.015 so groups not evenly dispersed, makes sense we had more syms than apos, so proceed w anosim 
+#Permutation test for homogeneity of multivariate dispersions
+#Permutation: free
+#Number of permutations: 999
+
+#Response: Distances
+ #         Df    Sum Sq   Mean Sq     F N.Perm Pr(>F)  
+#Groups     1 0.0059904 0.0059904 6.827    999  0.015 *
+#Residuals 23 0.0201815 0.0008775                      
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+anosim(dfbray, sampledf$status, permutations = 1000) #yes, R is 0.2784 and significance=0.002997
+#Call:
+#anosim(x = dfbray, grouping = sampledf$status, permutations = 1000) 
+#Dissimilarity: bray 
+
+#ANOSIM statistic R: 0.2784 
+#      Significance: 0.002997 
+
+#Permutation: free
+#Number of permutations: 1000
+
+#what about sym and apos in heat only?
+
+dfbray=phyloseq::distance(heat, method="bray")
+sampledf=data.frame(sample_data(heat))
+beta=betadisper(dfbray, sampledf$status)
+beta
+permutest(beta) #evenly dispersed at p=0.838 so adonis
+
+#Permutation test for homogeneity of multivariate dispersions
+#Permutation: free
+#Number of permutations: 999
+
+#Response: Distances
+ #         Df    Sum Sq   Mean Sq      F N.Perm Pr(>F)
+#Groups     1 0.0000339 3.388e-05 0.0383    999  0.838
+#Residuals 25 0.0221400 8.856e-04 
+
+adonis2(formula = dfbray ~ status, data = sampledf) #yes, there is still some differences between sym and apos 
+#Permutation test for adonis under reduced model
+#Terms added sequentially (first to last)
+#Permutation: free
+#Number of permutations: 999
+
+#adonis2(formula = dfbray ~ status, data = sampledf)
+##         Df SumOfSqs      R2      F Pr(>F)   
+#status    1  0.03338 0.08787 2.4084  0.006 **
+#Residual 25  0.34651 0.91213                 
+#Total    26  0.37989 1.00000                 
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# there is stat sig differences between sym vs apo (regardless of treatment), control vs heat (regardless of status)
+#and within control (sym vs apo) and heat (sym vs apo). 
+
+
+############################# boxplots for diff abundants? and phylo trees########################################
+#now that we have differentially abundant taxa of interest (from metacoder and from visual barplots), time to boxplot the most obvious suspects. Oligos were sig different as determined by metacoder and DESeq
+#check Oligoflexales
+
+site_colors<- c("#edae49", "#4DBBD5B2", "#00A087B2", "#3C5488B2", "#F39B7FB2", "#8491B4B2", "#91D1C2B2", "#DC0000B2", "#7E6148B2", "#8d96a3")#subset taxa of choice and repeat for each taxa you're interested in
+ps_fav_taxa= subset_taxa(ps2_rare, Order == "Oligoflexales")
+ps_fav_taxa 
+
+#dataframe to plot abundances 
+ps_favdf <- phyloseq::tax_glom(ps_fav_taxa, "Order")
+p4=phyloseq::psmelt(ps_favdf) %>%
+ggplot(data = ., aes(x = grupos, y = Abundance)) + theme_bw() +theme(text = element_text(size = 20))+ ylim(0,4000)+ 
+  scale_shape_manual(values = 16:17)+
+  geom_boxplot(outlier.shape  = NA) +
+  geom_jitter(aes(shape = status,  size=4), height = 0, width = .2) +
+  labs(x = "", y = "Abundance (Counts)\n") + ggtitle("Oligoflexales")+ theme(axis.text.x = element_text(face="bold", size=17),
+          axis.text.y = element_text(face="bold",  
+                           size= 17)) +
+ theme(text = element_text(size = 17))+ theme(legend.title = element_text(size = 17),
+          legend.text = element_text(size= 17))
+
+p4
+
+
+##############  Oligoflexales ASV abundance between samples: sym ctrl vs sym heat and apo ctrl vs apo heat #####################
+ps_fav_taxa= subset_taxa(sym, Order == "Oligoflexales")
+ps_fav_taxa 
+
+y=tax_table(ps_fav_taxa)
+write.csv(y, "oligo_no_labels.csv")
+#make a microbiome object 
+pseq.rel <- microbiome::transform(ps_fav_taxa, "compositional")
+
+
+dna <- Biostrings::DNAStringSet(taxa_names(pseq.rel))
+names(dna) <- taxa_names(pseq.rel)
+ps.m3.rel <- merge_phyloseq(pseq.rel, dna)
+taxa_names(ps.m3.rel) <- paste0("ASV", seq(ntaxa(pseq.rel)))
+taxa_names(ps.m3.rel)
+
+y=tax_table(ps.m3.rel)
+write.csv(y, "oligo_sym_only_ASVs_taxa.csv")
+
+#ASVs > phylo tree on Phyloseq of oligoflexales and other differential taxa 
+
+p5= plot_tree(ps.m3.rel, ladderize="left", size="abundance", plot.margin= 0.9, label.tips="taxa_names", base.spacing=0.01, text.size=5, sizebase=3)
+p5 + facet_wrap(~grupos, ncol=4)
+
+
+#transfer the oligoflexales ASVs to a fasta containing sequences of related organisms and an outgroup
+#proceed to make a phylogenetic tree to see whether our ASVs place w the other oligoflexia in the Bdellovibrionales Order tree
+
+############ Phylogenetic tree (maximum likelihood) ################
+
+#have a fasta ready with the sequences you want to analyze (in our case our ASVs, above and downloaded select sequences from the Bdellovibrionales order and
+#a couple available oligoflexales sequences. Bacteriovoraxes will be used as outgroups
+
+#This will be all done on HPC linux system----and on a Conda environment
+#Align the sequences with MUSCLE
+
+#make sure iqtree and muscle are all installed on anaconda 
+conda activate phylo_tree # or activate conda environment
+
+#align sequences
+muscle -align all_oligos.fa -output all_oligos_alignedseqs.fa
+
+#create tree with IQ tree
+
+# will need about 16 CPUs 
+#infer first phylogeny using the baseline command iqtree
+#-s specify file input > .fa
+#-B 1000 > 1000 replicates for ultrafast bootstrap
+#-T AUTO determines the best CPU but I already chose 16
+#this iqtree command will return various files
+
+#non-partitioned model
+iqtree -s all_oligos_alignedseqs.fa -B 1000 -T AUTO
+#visualize the .treefile on interactive tree of life
+
+ 
+
+########################### plot taxonomy bars ############################################################
+
+#plot taxa for visualization
+#reminder the groups are "sym", "apo", "ctrl", "heat" and ps2_rare (everyone together). 
+#will generate plots for all, to explore what's going on here
+
+
+library(randomcoloR)
+n <- 36
+palette <- distinctColorPalette(n)
+pie(rep(1, n), col=palette)
+
+phylum_p1<-transform_sample_counts(ps2_rare, function(x) x /sum(x))
+sample_sums(phylum_p1)
+
+p1=plot_bar(phylum_p1, fill="Class")+ scale_fill_manual(values=palette)
+p1
+phylumplot= p1+ geom_bar(aes(fill=Class), stat="identity", position="stack") 
+phylumplot + theme_bw()+ theme(text = element_text(size = 16)) +
+theme(axis.text.x = element_text(face="bold", size=10), axis.text.y = element_text(face="bold", size=14)) + 
+theme(text = element_text(size = 16))+theme(legend.title = element_text(size = 14), legend.text = element_text(size= 14))+facet_grid(~grupos, scale="free_x", drop=TRUE)
+
+#repeat this with groups of interest if you like  
+
+
+
