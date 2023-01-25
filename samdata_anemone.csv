@@ -1,0 +1,53 @@
+sample_ID,treatment,status,tank,sym_host_ratio,grupos
+Apo-Ctrl-1-1,control_25C,aposymbiotic ,1AC,0,apo_control
+Apo-Ctrl-1-3,control_25C,aposymbiotic ,1AC,,apo_control
+Apo-Ctrl-1-4,control_25C,aposymbiotic ,1AC,0,apo_control
+Apo-Ctrl-1-5,control_25C,aposymbiotic ,1AC,0,apo_control
+Apo-Ctrl-2-1,control_25C,aposymbiotic ,2AC,0,apo_control
+Apo-Ctrl-2-2,control_25C,aposymbiotic ,2AC,0,apo_control
+Apo-Ctrl-2-3,control_25C,aposymbiotic ,2AC,0,apo_control
+Apo-Ctrl-2-4,control_25C,aposymbiotic ,2AC,0,apo_control
+Apo-Ctrl-2-5,control_25C,aposymbiotic ,2AC,0,apo_control
+Apo-HEAT-1-1,thermal_32C,aposymbiotic ,1AH,0,apo_heat
+Apo-HEAT-1-2,thermal_32C,aposymbiotic ,1AH,,apo_heat
+Apo-HEAT-1-3,thermal_32C,aposymbiotic ,1AH,,apo_heat
+Apo-HEAT-1-4,thermal_32C,aposymbiotic ,1AH,,apo_heat
+Apo-HEAT-1-5,thermal_32C,aposymbiotic ,1AH,0.01,apo_heat
+Apo-HEAT-1-6,thermal_32C,aposymbiotic ,1AH,0,apo_heat
+Apo-HEAT-2-1,thermal_32C,aposymbiotic ,2AH,,apo_heat
+Apo-HEAT-2-2,thermal_32C,aposymbiotic ,2AH,0,apo_heat
+Apo-HEAT-2-3,thermal_32C,aposymbiotic ,2AH,0,apo_heat
+Apo-HEAT-2-4,thermal_32C,aposymbiotic ,2AH,,apo_heat
+Apo-HEAT-2-5,thermal_32C,aposymbiotic ,2AH,0.01,apo_heat
+Apo-HEAT-2-6,thermal_32C,aposymbiotic ,2AH,0,apo_heat
+Sym-Ctrl-1-2,control_25C,symbiotic,1SC,0.32,sym_control
+Sym-Ctrl-1-3,control_25C,symbiotic,1SC,0.26,sym_control
+Sym-Ctrl-1-4,control_25C,symbiotic,1SC,,sym_control
+Sym-Ctrl-1-5,control_25C,symbiotic,1SC,,sym_control
+Sym-Ctrl-1-6,control_25C,symbiotic,1SC,0.44,sym_control
+Sym-Ctrl-2-1,control_25C,symbiotic,2SC,0.27,sym_control
+Sym-Ctrl-2-2,control_25C,symbiotic,2SC,,sym_control
+Sym-Ctrl-2-3,control_25C,symbiotic,2SC,0.37,sym_control
+Sym-Ctrl-2-4,control_25C,symbiotic,2SC,,sym_control
+Sym-Ctrl-2-5,control_25C,symbiotic,2SC,,sym_control
+Sym-Ctrl-2-6,control_25C,symbiotic,2SC,,sym_control
+Sym-Ctrl-3-1,control_25C,symbiotic,3SC,0.32,sym_control
+Sym-Ctrl-3-2,control_25C,symbiotic,3SC,0.16,sym_control
+Sym-Ctrl-3-3,control_25C,symbiotic,3SC,,sym_control
+Sym-Ctrl-3-4,control_25C,symbiotic,3SC,,sym_control
+Sym-Ctrl-3-5,control_25C,symbiotic,3SC,0.38,sym_control
+Sym-HEAT-1-2,thermal_32C,symbiotic,1SH,0.11,sym_heat
+Sym-HEAT-1-3,thermal_32C,symbiotic,1SH,0.14,sym_heat
+Sym-HEAT-1-4,thermal_32C,symbiotic,1SH,0.22,sym_heat
+Sym-HEAT-1-5,thermal_32C,symbiotic,1SH,0.33,sym_heat
+Sym-HEAT-1-6,thermal_32C,symbiotic,1SH,0.16,sym_heat
+Sym-HEAT-2-1,thermal_32C,symbiotic,2SH,0.21,sym_heat
+Sym-HEAT-2-2,thermal_32C,symbiotic,2SH,0.28,sym_heat
+Sym-HEAT-2-3,thermal_32C,symbiotic,2SH,,sym_heat
+Sym-HEAT-2-5,thermal_32C,symbiotic,2SH,,sym_heat
+Sym-HEAT-2-6,thermal_32C,symbiotic,2SH,0.19,sym_heat
+Sym-HEAT-3-1,thermal_32C,symbiotic,3SH,,sym_heat
+Sym-HEAT-3-2,thermal_32C,symbiotic,3SH,0.3,sym_heat
+Sym-HEAT-3-3,thermal_32C,symbiotic,3SH,,sym_heat
+Sym-HEAT-3-4,thermal_32C,symbiotic,3SH,,sym_heat
+Sym-HEAT-3-5,thermal_32C,symbiotic,3SH,0.1,sym_heat
