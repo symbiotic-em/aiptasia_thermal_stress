@@ -83,11 +83,6 @@ all_df=read.csv("sym1_samdata.csv", header=TRUE,stringsAsFactors=TRUE)
 names(all_df)
 summary(all_df)
 
-#select samples that are symbiotic only 
-sym_df=all_df[which(all_df$status=='symbiotic'),]
-
-sym_df <- sym_df %>% drop_na(sym_host_ratio) #remove samples for which there was insufficient DNA for qPCR
-sym_df
 attach(sym_df)#this way I don't have to call up the dataframe over and overagain, just make sure you detach if you switch dataframes
 
 #visualize data
@@ -233,7 +228,7 @@ anova(model1) #just barely gets there! p<0.05 for treatment when accounting for 
 
 ############### oligo vs symhost regression line plot #######################
 
-#use the sym1 (which is the excel file with only symbiotic anemone data that had sym host ratio information AND oligo counts info 
+#use the sym1_samdata.csv (which is the excel file with only symbiotic anemone data that had sym host ratio information AND oligo counts info 
 ggplot(data = sym1, aes(x = sym_host_ratio, y =oligo_count)) +  
   scale_y_log10()+ theme_bw()+ theme(axis.text.x = element_text(face="bold", 
                            size=12),
