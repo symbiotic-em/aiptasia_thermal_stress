@@ -1,0 +1,267 @@
+library(ape)
+library(ggplot2)
+library(plyr)
+library(grid)
+library("nlme")
+library("reshape2")
+library("dplyr")
+library(tidyverse)
+library(lme4)
+
+#################### Using your phyloseq object "sym1" (found under "General_microbiome_analysis") get taxa counts for correlations ##############################
+lab= subset_taxa(sym1, Order == "Oligoflexales")
+lab
+
+#add a tree
+random_tree=rtree(ntaxa(lab), rooted=TRUE, tip.label=taxa_names(lab))
+#merge the tree
+lab=merge_phyloseq(lab, random_tree)
+lab
+
+#####create factor and get the counts for each sample of oligos or any genera you wanna test, from issues #337 in Phyloseq Github
+symfac = factor(tax_table(lab)[, "Order"])
+# Tabulate the counts for each genera in each sample
+symtab = apply(otu_table(lab), MARGIN = 1, function(x) {
+    tapply(x, INDEX = symfac, FUN = sum, na.rm = TRUE, simplify = TRUE)
+})
+symtab
+write.csv(symtab, "oligocounts_only_sym.csv")
+
+#repeat with any other taxa you'd like to test: we additionally did this with staphylococcus, cutibacterieum 
+#now copy and paste, transfer the counts to your samdata file to be used in corrplots, as column 
+
+######### corrplot (alpha diversity vs symhost ratio) and (taxa counts vs sym host ratio) ############################
+
+#copy and paste s:h ratios in excel file to "alpha_diversity_sym1.csv" (file obtained in "General_microbiome_analysis")
+
+library(ggpubr)
+library(tidyverse)
+library(corrplot)
+library(Hmisc)
+samdata=read.csv("alpha_diversity_sym1.csv") ##can only correlate numeric fgactors so check data first
+sapply(samdata, class)
+
+#find out which are factors
+sapply(samdata, is.factor)
+
+#now correlate by removing data that is not numeric using sapply
+m=cor(samdata[sapply(samdata, function(x) !is.character(x))])
+head(round(m, 2))
+
+#visualize using different functions
+corrplot(m, method="circle")
+corrplot(m, method="pie")
+corrplot(m, method="number")
+
+#introduce a new color palette
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(m, method = "color", col = col(200),   type = "upper", order = "hclust", 
+          addCoef.col = "black",  tl.col = "darkblue", tl.srt = 45,sig.level = 0.01,  
+        # hide correlation coefficient on the principal diagonal
+          diag = FALSE )
+          
+#draw scatter plots
+library("PerformanceAnalytics")
+
+#take out all the non-numerics
+mydata=samdata[sapply(samdata, function(x) !is.character(x))]
+chart.Correlation(mydata, histogram = TRUE, pch = 19)
+
+#in the plot:
+#The distribution of each variable is shown on the diagonal.
+#On the bottom of the diagonal : the bivariate scatter plots with a fitted line are displayed
+#On the top of the diagonal : the value of the correlation plus the significance level as stars
+#Each significance level is associated to a symbol : p-values(0, 0.001, 0.01, 0.05, 0.1, 1) <=> symbols(��,��,��, �.�, " �)
+
+#heatmap corr visualization
+col <- colorRampPalette(c("darkblue", "white", "darkorange"))(20)
+heatmap(x = m, col = col, symm = TRUE)
+
+
+setwd("/Users/emily/Documents/Anemone_TS")
+all_df=read.csv("sym1_samdata.csv", header=TRUE,stringsAsFactors=TRUE)
+names(all_df)
+summary(all_df)
+
+#select samples that are symbiotic only 
+sym_df=all_df[which(all_df$status=='symbiotic'),]
+
+sym_df <- sym_df %>% drop_na(sym_host_ratio) #remove samples for which there was insufficient DNA for qPCR
+sym_df
+attach(sym_df)#this way I don't have to call up the dataframe over and overagain, just make sure you detach if you switch dataframes
+
+#visualize data
+library(ggpubr)
+
+#visualize data using different factors
+bxp <- ggboxplot(sym_df, x = "treatment", y = "sym_host_ratio" )+ geom_point(aes(color = factor(tank)), size = 4)
+bxp
+
+########################### slightly prettier plot for funsies; I think plotting treatment tank is optional here...
+pd <- position_dodge(.2)
+ggplot(sym_df,aes(factor(treatment),sym_host_ratio,fill=treatment))+
+	geom_boxplot(outlier.shape=16, notch=FALSE)+
+	geom_point(aes(colour=factor(tank)),position=pd,show.legend=TRUE)+
+	labs(colour="tank")+
+	#scale_colour_manual(values=c(point="gray60"))+
+	labs(subtitle="Symbiotic Anemones", y="S:H cell ratio")+
+	scale_x_discrete(labels=c('control (25°C)', 'thermal (32°C)'))+
+	xlab(NULL)+
+	#theme(axis.text.x=element_text(size=20))+
+	theme_classic()+
+	scale_fill_manual(values=c("snow4","snow2"),guide=FALSE)+
+	theme(axis.text=element_text(size=11))+
+	theme(plot.subtitle=element_text(hjust=0.5))
+  
+###############################
+
+
+#explore normality of the data
+hist(sym_df$sym_host_ratio)#close to normal distribution!
+
+#so our model should prob be linear model and not glm (for non-normal distributions)
+#help from this site: https://ourcodingclub.github.io/tutorials/mixed-models/
+
+basic.lm <- lm(sym_host_ratio ~ treatment, data = sym_df)
+summary(basic.lm)
+#Call:
+#lm(formula = sym_host_ratio ~ treatment, data = sym_df)
+#Residuals:
+#    Min      1Q  Median      3Q     Max 
+#-0.1550 -0.0525  0.0050  0.0625  0.1260 
+#Coefficients:
+#                     Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)           0.31500    0.02919  10.793 9.41e-09 ***
+#treatmentthermal_32C -0.11100    0.03916  -2.835    0.012 *  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 0.08255 on 16 degrees of freedom
+#Multiple R-squared:  0.3343,    Adjusted R-squared:  0.2927 
+#F-statistic: 8.035 on 1 and 16 DF,  p-value: 0.01195
+
+plot(basic.lm, which = 1) #yes red and grey lines agree
+plot(basic.lm, which = 2) #yes, distributions fall along diagonal line
+
+################## Is data independent>? What about tank effects? ################
+
+boxplot(sym_host_ratio ~ tank, data = sym_df)
+
+#modify the lm to account for possible tank effects
+tank.lm <- lm(sym_host_ratio ~ treatment + tank, data = sym_df)
+summary(tank.lm)
+
+Call:
+lm(formula = sym_host_ratio ~ treatment + tank, data = sym_df)
+
+#Residuals:
+#     Min       1Q   Median       3Q      Max 
+#-0.12667 -0.05150 -0.01833  0.05250  0.13800 
+
+#Coefficients: (1 not defined because of singularities)
+#                     Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)           0.34000    0.05334   6.375 3.53e-05 ***
+#treatmentthermal_32C -0.14000    0.08433  -1.660    0.123    
+#tank1SH              -0.00800    0.07729  -0.104    0.919    
+#tank2SC              -0.02000    0.08433  -0.237    0.817    
+#tank2SH               0.02667    0.08433   0.316    0.757    
+#tank3SC              -0.05333    0.07543  -0.707    0.493    
+#tank3SH                    NA         NA      NA       NA    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 0.09238 on 12 degrees of freedom
+#Multiple R-squared:  0.3748,    Adjusted R-squared:  0.1143 
+#F-statistic: 1.439 on 5 and 12 DF,  p-value: 0.2797
+
+#ok we want to control for variation between the tanks as a "random factor" so we will have to do a mixed model
+mixed.lmer <- lmer(sym_host_ratio ~ treatment + (1|tank), data = sym_df)
+summary(mixed.lmer)
+#Linear mixed model fit by REML ['lmerMod']
+#Formula: sym_host_ratio ~ treatment + (1 | tank)
+#   Data: sym_df
+
+#REML criterion at convergence: -30
+
+#Scaled residuals: 
+#     Min       1Q   Median       3Q      Max 
+#-1.87758 -0.63595  0.06057  0.75709  1.52629 
+
+#Random effects:
+# Groups   Name        Variance Std.Dev.
+ #tank     (Intercept) 0.000000 0.00000 
+# Residual             0.006815 0.08255 
+#Number of obs: 18, groups:  tank, 6
+
+#Fixed effects:
+                     Estimate Std. Error t value
+#(Intercept)           0.31500    0.02919  10.793
+#treatmentthermal_32C -0.11100    0.03916  -2.835
+
+#Correlation of Fixed Effects:
+ #           (Intr)
+#trtmntt_32C -0.745
+#optimizer (nloptwrap) convergence code: 0 (OK)
+#boundary (singular) fit: see help('isSingular') <- WARNING! which means the random effects are too small, so use less complex model?
+
+#this means that 1st simple model from the top may suffice ^^^ 
+
+#fixed effects = treatment
+#random effects = tank
+#dependent/response value=sym_host_ratio 
+
+#anyway, yes there's a sig difference on symbiont to host ratio depending on treatment
+
+#################### try nlme package to see if singularity issue can be solved with REML
+
+model1 <- lme(sym_host_ratio ~ treatment,data=sym_df,random= ~1|tank, method="REML", na.action=na.omit) 
+
+par(mfrow=c(1,2))
+#Diagnostics to determine if models are any good to begin with
+qqplot(residuals(model1),xlab= "Theoretical Quantiles", ylab="Observed Quantiles") #try a transform if data are non-normal
+
+qqnorm(model1, ~ranef(., level=1))
+
+
+#check homoscedascitity by plotting residuals against fitted values
+plot(model1,which=1) #want random scatter; no apparent trendline
+
+
+summary(model1)
+anova(model1) #just barely gets there! p<0.05 for treatment when accounting for tank as random effect...
+
+
+############### oligo vs symhost regression line plot #######################
+
+#use the sym1 (which is the excel file with only symbiotic anemone data that had sym host ratio information AND oligo counts info 
+ggplot(data = sym1, aes(x = sym_host_ratio, y =oligo_count)) +  
+  scale_y_log10()+ theme_bw()+ theme(axis.text.x = element_text(face="bold", 
+                           size=12),
+          axis.text.y = element_text(face="bold",  
+                           size=14))+
+           theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))+ geom_point(size = 3)+
+geom_abline(intercept = intercept, slope = slope, color="red", 
+               linetype="dashed", size=1.5)+
+  ggtitle("Oligoflexales abundance correlates with higher sym-host ratio")         
+
+
+reg<-lm(formula = oligo_count ~ sym_host_ratio,
+   data=sym1)                      
+  
+#get intercept and slope value
+coeff<-coefficients(reg)          
+intercept<-coeff[1]
+slope<- coeff[2]
+  
+# Create basic ggplot
+ggp <- ggplot(data, aes(x, y)) +   
+  geom_point()
+  
+# add the regression line
+ggp+geom_abline(intercept = intercept, slope = slope, color="red", 
+               linetype="dashed", size=1.5)+
+  ggtitle("Oligos_vs_sym-host)   
+  
+ 
+
