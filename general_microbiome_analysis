@@ -219,7 +219,6 @@ heat_tree(ps2_m,
 
 # use this code for multiple comparisons, if you want use the whole dataset
 
-
 set.seed(1)
 heat_tree_matrix(ps2_m,
 data= "diff_site",
@@ -227,7 +226,7 @@ node_label = taxon_names,
 node_size = n_obs,
 node_color = log2_median_ratio,
 node_color_trans= "linear",
-node_color_range=  c("#009E73", "gray", "#CC79A7"),
+node_color_range=  c("#CC79A7", "gray", "#009E73"),
 node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
 edge_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
 node_size_axis_label = "No. of ASV",
