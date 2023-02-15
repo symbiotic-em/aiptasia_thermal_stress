@@ -212,34 +212,45 @@ anova(model1) #just barely gets there! p<0.05 for treatment when accounting for 
 ############### oligo vs symhost regression line plot #######################
 
 #use the sym1_samdata.csv (which is the excel file with only symbiotic anemone data that had sym host ratio information AND oligo counts info 
-ggplot(data = sym1, aes(x = sym_host_ratio, y =oligo_count)) +  
-  scale_y_log10()+ theme_bw()+ theme(axis.text.x = element_text(face="bold", 
+ggp=ggplot(data = sym1, aes(x = sym_host_ratio, y =oligo_cts)) + theme_bw()+ theme(axis.text.x = element_text(face="bold", 
                            size=12),
           axis.text.y = element_text(face="bold",  
                            size=14))+
            theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"))+ geom_point(size = 3)+
-geom_abline(intercept = intercept, slope = slope, color="red", 
-               linetype="dashed", size=1.5)+
-  ggtitle("Oligoflexales abundance correlates with higher sym-host ratio")         
+        axis.title=element_text(size=14,face="bold"))+ geom_point(size = 3)+  
+       geom_abline(intercept=0, slope=reg$coefficients[1],size=1.1)+ 
+     geom_smooth(method=lm, se=TRUE, formula=y~0+x, col="black") +
+  labs(title='Regression through the Origin')
+ggp
 
 
-reg<-lm(formula = oligo_count ~ sym_host_ratio,
+
+##########################################
+
+reg<-lm(formula = oligo_cts ~ 0 + sym_host_ratio,
    data=sym1)                      
   
+summary(reg)
+
 #get intercept and slope value
 coeff<-coefficients(reg)          
 intercept<-coeff[1]
 slope<- coeff[2]
   
-# Create basic ggplot
-ggp <- ggplot(data, aes(x, y)) +   
-  geom_point()
-  
-# add the regression line
-ggp+geom_abline(intercept = intercept, slope = slope, color="red", 
-               linetype="dashed", size=1.5)+
-  ggtitle("Oligos_vs_sym-host)   
-  
- 
+#Call:
+#lm(formula = oligo_cts ~ 0 + sym_host_ratio, data = samdata)
+
+#Residuals:
+#   Min     1Q Median     3Q    Max 
+#-899.1 -507.9 -219.0   33.7 2426.3 
+
+#Coefficients:
+#               Estimate Std. Error t value Pr(>|t|)    
+#sym_host_ratio   3220.3      696.4   4.624 0.000242 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 799.8 on 17 degrees of freedom
+#Multiple R-squared:  0.5571,    Adjusted R-squared:  0.531 
+#F-statistic: 21.38 on 1 and 17 DF,  p-value: 0.0002423
 
