@@ -7,21 +7,15 @@ library(data.table)
 library(plyr)
 library(vegan)
 library(grid)
-library(DESeq2)
-#library(DESeq)
-library(outliers)
 library(gridExtra)#for grid.arrange
 library("nlme")
 library("reshape2")
 library("dplyr")
-library("edgeR"); packageVersion("edgeR")
-library(arrayQualityMetrics)
 library(microbiome) 
-library(eulerr)
-library(dunn.test)
 library(ggpubr)
 library(RColorBrewer)
 library(paletteer)
+
 setwd("/Users/emily/Documents/Anemone_TS")
 
 seqtab=readRDS("seqtab_anemone.rds")
@@ -142,7 +136,7 @@ apo #774 taxa and 21 samples
 *********************** METACODER ***************************************
 ####Differential abundance and taxonomy trees 
 
-library(metacoder) #detach package after done using because it masks functions in other packages 
+library(metacoder) # IMPORTANT----detach package after done using, because it masks functions in ape and phyloseq 
 
 #parse your ps2_rare phyloseq object to metacoder native data format 
 
