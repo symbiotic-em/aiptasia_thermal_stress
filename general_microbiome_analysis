@@ -247,7 +247,7 @@ ps2_m$data$diff_site$log2_median_ratio[ps2_m$data$diff_site$wilcox_p_value > 0.0
 
 
 ############################## Alpha diversity and stats ##################################
-detach(package:phyloseq.extended, unload=TRUE)
+
 
 #chao1, shannon and richness plots 
 
@@ -255,15 +255,17 @@ alph <- estimate_richness(ps_rare, measures = c("Observed", "Shannon", "Simpson"
 alph
 write.csv(alph, "alpha_diversity_ps_rare.csv") #for a record or other analysis, like corrplots
 #plot richness by measure
-p1= plot_richness(ps_rare, x="grupos", measures= "Chao1")+  geom_boxplot(fill="gray") + theme(text = element_text(size = 16))+ theme_bw()
-p1w2=p1+ theme(axis.text.x = element_text(face="bold", 
-                           size=12),
-          axis.text.y = element_text(face="bold",  
-                           size=14))+
-           theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"))+
+p1= plot_richness(ps_rare, x="grupos", measures= "Chao1")+ theme(text = element_text(size = 18))+ theme_bw()
+p1w2=p1 + geom_violin(fill="grey90")+ geom_jitter(width=0.15, alpha=0.8,size=2)+ theme(axis.text.x = element_text( 
+                           size=20),
+          axis.text.y = element_text(  
+                           size=20))+
+           theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=24))+
        ylab("Chao1 diversity")+ xlab ("Treatment")
-p1w2
+
+
+p1w2 
 
 #is the data normal?
 hist(alph$Chao1, main="Chao1 diversity", breaks=10) #mmmm kind of 
