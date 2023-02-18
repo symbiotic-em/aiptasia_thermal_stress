@@ -8,7 +8,6 @@ Annotations in the .R script describe input files, although all analyses can be 
 
 # Files in this repository
 
-- Input file: alpha_diversity_sym1.csv alpha diversity, sym_host_ratios and select taxa abundance counts for symbiotic anemones only
 - Input file: all_oligos.txt text file containing all sequences used for the phylogenetic analyses. Should be connverted to .fa before analysis
 - Input file: oligocounts_only_sym.csv count data (total abundance per sample) for oligoflexales in symbiotic anemones only
 - Input file: propioni_cutibacterium_only_sym.csv count data (total abundance per sample) for propionibacteriales in symbiotic anemones only
