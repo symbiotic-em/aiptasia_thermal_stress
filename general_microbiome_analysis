@@ -244,7 +244,9 @@ ps2_m$data$diff_site$log2_median_ratio[ps2_m$data$diff_site$wilcox_p_value > 0.0
 
 #repeat the heat_tree above, anything change?
 
-
+#get the taxon_ID names so you can compare which taxa were sig. different and serve as a key to your differential abundance table 
+x=ps2_m$taxon_names()
+write.csv(x, "taxon_id_key.csv")
 
 ############################## Alpha diversity and stats ##################################
 
