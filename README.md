@@ -10,8 +10,6 @@ Annotations in the .R script describe input files, although all analyses can be 
 
 - Input file: all_oligos.txt text file containing all sequences used for the phylogenetic analyses. Should be connverted to .fa before analysis
 - Input file: oligocounts_only_sym.csv count data (total abundance per sample) for oligoflexales in symbiotic anemones only
-- Input file: propioni_cutibacterium_only_sym.csv count data (total abundance per sample) for propionibacteriales in symbiotic anemones only
-- Input file: staph_only_sym.csv count data (total abundance per sample) for Staphylococcales in symbiotic anemones only
 - Input file: sym1_samdata.csv Metadata for symbiotic anemones only, includes sym host ratios and taxa abundance counts for symbiotic anemones only  
 - Input file: samdata_anemone.csv sample data. Metadata including sym host ratios for all  
 - Input file: seqtab_anemone.rds sequence table 
