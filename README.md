@@ -1,10 +1,10 @@
 # Aiptasia_thermal_stress_experiment
-R scripts and input files for completing analyses described in "___________", by Emily Aguirre, emilyagu@usc.edu et al. 
+R scripts and input files for completing analyses described in "Abundance of Oligoflexales bacteria is associated with algal symbiont density independent of thermal stress in Aiptasia anemones", by Emily G Aguirre, Marissa J Fine and Carly D Kenkel. Corresponding author --> emilyagu@usc.edu et al. 
 
 We investigated the role of possible Symbiodiniaceae-associated microbial associates in the holobiont of clonal (aposymbiotic and symbiotic) Aiptasia, strain CC7. 
 Anemones were subjected to thermal stress and symbiont expulsion (mild bleaching) was calculated using qPCR. We used amplicon sequencing of the 16S rRNA gene to assess microbial correlations, composition, richness and beta-diversity between anemones in ambient, control conditions vs those in thermally stressed
 
-Annotations in the .R script describe input files, although all analyses can be re-created by starting with the raw .fastq files available for download at NCBI SRA under accession code: ____________.
+Annotations in the .R script describe input files, although all analyses can be re-created by starting with the raw .fastq files available for download at NCBI SRA under accession code: PRJNA929535.
 
 # Files in this repository
 
@@ -17,7 +17,7 @@ Annotations in the .R script describe input files, although all analyses can be 
 - Input file: seqtab_anemone.rds sequence table 
 - Input file: taxa_anemone.rds taxonomy table
 
-- Sequences: Please see demultiplexed sequences, available at the National Center for Biotechnology Information (NCBI) Sequence Read Archives (SRA) under accession code: ________________
+- Sequences: Please see demultiplexed sequences, available at the National Center for Biotechnology Information (NCBI) Sequence Read Archives (SRA) under accession code: PRJNA929535
 
 
 # Scripts 
