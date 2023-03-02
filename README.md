@@ -1,5 +1,6 @@
 # Aiptasia_thermal_stress_experiment
-R scripts and input files for completing analyses described in "Abundance of Oligoflexales bacteria is associated with algal symbiont density independent of thermal stress in Aiptasia anemones", by Emily G Aguirre, Marissa J Fine and Carly D Kenkel. Corresponding author --> emilyagu@usc.edu et al. 
+R scripts and input files for completing analyses described in "Abundance of Oligoflexales bacteria is associated with algal symbiont density independent of thermal stress in Aiptasia anemones", by Emily G Aguirre, Marissa J Fine and Carly D Kenkel. 
+Corresponding author --> Emily Aguirre at emilyagu@usc.edu et al. 
 
 We investigated the role of possible Symbiodiniaceae-associated microbial associates in the holobiont of clonal (aposymbiotic and symbiotic) Aiptasia, strain CC7. 
 Anemones were subjected to thermal stress and symbiont expulsion (mild bleaching) was calculated using qPCR. We used amplicon sequencing of the 16S rRNA gene to assess microbial correlations, composition, richness and beta-diversity between anemones in ambient, control conditions vs those in thermally stressed
