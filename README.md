@@ -23,5 +23,7 @@ Annotations in the .R script describe input files, although all analyses can be 
 - general_microbiome_analysis: Annotated R script (based on Phyloseq and other statistical software in R) for general analysis and visualization of metabarcoded data
 - sym_host_ratio: Annotated R script containing info on how to conduct stats, correlation plots, and visualizations of samples assesed for sym host ratios   
 
-
+# Statistical output for Metacoder
+- output file: metacoder_stat_output.csv statistical output corresponding to differential heat trees created in Metacoder 
+- output file: metacoder_taxon_id_key.csv taxon ID keys corresponding to metacoder_stat_output.csv file above 
 
